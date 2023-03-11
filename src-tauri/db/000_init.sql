@@ -1,0 +1,69 @@
+-- 人のテーブルを作成する
+CREATE TABLE
+    IF NOT EXISTS people (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        born_timestamp INTEGER NOT NULL,
+        death_timestamp INTEGER,
+        gender TEXT NOT NULL, --ENUM ('Male', 'Female')
+        job TEXT,
+        staying_city_id INTEGER NOT NULL,
+        home_city_id INTEGER NOT NULL,
+        country_id INTEGER,
+        FOREIGN KEY (staying_city_id) REFERENCES cities (id),
+        FOREIGN KEY (home_city_id) REFERENCES cities (id),
+        FOREIGN KEY (country_id) REFERENCES countries (id)
+    );
+
+CREATE TABLE
+    IF NOT EXISTS relationships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        self_id INTEGER NOT NULL,
+        target_id INTEGER NOT NULL,
+        impression INTEGER NOT NULL,
+        relation_type TEXT NOT NULL, --ENUM ('Child',"Parent","Sibling","Partner","Acquaintance","Clan")
+        FOREIGN KEY (self_id) REFERENCES people (id),
+        FOREIGN KEY (target_id) REFERENCES people (id)
+    );
+
+-- 街のテーブルを作成する
+CREATE TABLE
+    IF NOT EXISTS cities (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        position_x INTEGER NOT NULL,
+        position_y INTEGER NOT NULL,
+        dev_production INTEGER NOT NULL,
+        dev_building INTEGER NOT NULL,
+        dev_infrastructure INTEGER NOT NULL,
+        exp_dev_production INTEGER NOT NULL,
+        exp_dev_building INTEGER NOT NULL,
+        exp_dev_infrastructure INTEGER NOT NULL,
+        control INTEGER NOT NULL,
+        environment INTEGER NOT NULL,
+        region_id INTEGER NOT NULL,
+        country_id INTEGER,
+        FOREIGN KEY (region_id) REFERENCES regions (id),
+        FOREIGN KEY (country_id) REFERENCES countries (id)
+    );
+
+-- 地域のテーブルを作成する
+CREATE TABLE
+    IF NOT EXISTS regions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        product TEXT NOT NULL,
+        country_id INTEGER,
+        FOREIGN KEY (country_id) REFERENCES countries (id)
+    );
+
+-- 国のテーブルを作成する
+CREATE TABLE
+    IF NOT EXISTS countries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        color_primary TEXT NOT NULL,
+        color_secondary TEXT NOT NULL,
+        capital_city_id INTEGER NOT NULL,
+        FOREIGN KEY (capital_city_id) REFERENCES cities (id)
+    );
