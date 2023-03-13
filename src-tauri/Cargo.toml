@@ -25,6 +25,8 @@ sqlx = { version = "0.6.2", features = ["runtime-tokio-rustls", "sqlite", "migra
 anyhow = "1.0.69"
 dunce = "1.0.3"
 spin_sleep = "1.1.1"
+rayon = "1.7.0"
+once_cell = "1.17.1"
 
 
 [features]

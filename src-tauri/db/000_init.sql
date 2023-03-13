@@ -1,6 +1,6 @@
 -- 人のテーブルを作成する
 CREATE TABLE
-    IF NOT EXISTS people (
+    IF NOT EXISTS citizens (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         born_timestamp INTEGER NOT NULL,
@@ -22,8 +22,8 @@ CREATE TABLE
         target_id INTEGER NOT NULL,
         impression INTEGER NOT NULL,
         relation_type TEXT NOT NULL, --ENUM ('Child',"Parent","Sibling","Partner","Acquaintance","Clan")
-        FOREIGN KEY (self_id) REFERENCES people (id),
-        FOREIGN KEY (target_id) REFERENCES people (id)
+        FOREIGN KEY (self_id) REFERENCES citizen (id),
+        FOREIGN KEY (target_id) REFERENCES citizen (id)
     );
 
 -- 街のテーブルを作成する

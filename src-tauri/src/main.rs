@@ -1,49 +1,139 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use anyhow::Result;
+use citizen::Citizen;
+use once_cell::sync::Lazy;
+use parking_lot::{Mutex, RawMutex};
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::{
-    sync::mpsc::{self, Sender},
+    collections::HashMap,
+    sync::{
+        mpsc::{self, Sender},
+        Arc,
+    },
     time::{Duration, Instant},
 };
 
-use futures::channel::mpsc::Receiver;
-use tauri::Manager;
-pub(crate) mod agent;
+use tauri::{AppHandle, Manager, State};
+pub static TIMESTAMP: Lazy<Mutex<u128>> = Lazy::new(|| Mutex::new(0));
+
+pub(crate) mod citizen;
+pub(crate) mod city;
 pub(crate) mod db;
+pub(crate) mod utils;
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+// #[tauri::command]
+// async fn my_custom_command(app_handle: tauri::AppHandle) {
+//   let app_dir = app_handle.path_resolver().app_dir();
+//   use tauri::GlobalShortcutManager;
+//   app_handle.global_shortcut_manager().register("CTRL + U", move || {});
+// }
 #[tauri::command]
-fn play_speed_update(speed: i32)  {
+async fn play_speed_update(
+    sender: State<'_, tokio::sync::mpsc::Sender<u8>>,
+    speed: u8,
+) -> Result<(), &str> {
+    println!("change speed:{}", speed);
+    match sender.send(speed).await {
+        Ok(_) => Ok(()),
+        Err(_) => Err("send error on play_speed_update"),
+    }
+}
+#[derive(Debug, Default)]
+struct GameManager {
+    pub citizens: HashMap<i32, Arc<Mutex<Citizen>>>,
+    pub cities: HashMap<i32, city::City>,
+}
+impl GameManager {
+    pub fn new() -> Self {
+        let mut s = Self::default();
+        for i in 0..10000 {
+            s.citizens.insert(
+                i,
+                Arc::new(Mutex::new(Citizen::new(
+                    i,
+                    Some(&("John".to_string() + &i.to_string())),
+                ))),
+            );
+        }
+        // s.citizens
+        //     .insert(1, Arc::new(Mutex::new(Citizen::new(1, Some("John")))));
+        // s.citizens
+        //     .insert(2, Arc::new(Mutex::new(Citizen::new(2, Some("Maria")))));
+        // s.citizens
+        //     .insert(3, Arc::new(Mutex::new(Citizen::new(3, Some("Pochi")))));
+        s
+    }
+    pub fn execute(&mut self, game_speed: u8) -> Result<u128> {
+        // println!("{:?}", self.citizens);
+        let pf = Instant::now();
+        self.citizens = Citizen::execute(self.citizens.clone()).unwrap();
+        println!(
+            "duration of execution:{:?}ms",
+            pf.elapsed().as_secs_f64() * 1000.0
+        );
+        println!("{:?}", self.citizens[&0]);
+
+        spin_sleep::sleep(Duration::from_millis(50));
+        Ok(*TIMESTAMP.lock() + 1)
+    }
+    pub fn wait_duration(game_speed: u8) -> Duration {
+        Duration::from_millis(1000 / game_speed.max(1) as u64)
+    }
+}
+
+#[cfg(test)]
+mod test;
+pub async fn test_fn() {
+    let mut game_manager = GameManager::new();
+    game_manager.execute(1);
+    game_manager.execute(1);
+    game_manager.execute(1);
 }
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // このmain関数はasync fnではないので、asyncな関数を呼ぶのにblock_on関数を使う
     let sqlite_pool = db::init_db().await?;
-    let (sender, mut receiver) = tokio::sync::mpsc::channel(1);
+    let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
     // サブスレッドの開始
-    let s = sender.clone();
-
     tokio::spawn(async move {
-        let mut play_speed = 0;
-        let mut time = 0;
+        let mut game_manager = GameManager::new();
+        let mut play_speed: u8 = 0;
         let mut last_update = Instant::now();
-
         loop {
-            // メインスレッドからメッセージの受信. 受信するまで処理を待つ
-            if let Ok(val) = receiver.try_recv() {
-                play_speed = val;
-                println!("hen na tokoro de new play speed:{}", play_speed);
-            }
+            // // メインスレッドからメッセージの受信. 受信するまで処理を待つ
+            // if let Ok(val) = receiver.try_recv() {
+            //     play_speed = val;
+            //     println!("hen na tokoro de new play speed:{}", play_speed);
+            // }
+            let mut d = if let Some(d) =
+                GameManager::wait_duration(play_speed).checked_sub(last_update.elapsed())
+            {
+                d
+            } else {
+                Duration::ZERO
+            };
+
             println!("play_speed:{}", play_speed);
-            if play_speed == 0 {
-                let val = receiver.recv().await;
-                if let Some(val) = val {
-                    play_speed = val;
-                    last_update = Instant::now();
-                }
-            }
-            let mut d =
-                Duration::from_millis((1000 / play_speed).min(1000)) - last_update.elapsed();
+
             loop {
+                if play_speed == 0 {
+                    let val = receiver.recv().await;
+                    if let Some(val) = val {
+                        /*
+                         * 0 -> pause
+                         * 1 -> 1 hour /sec
+                         * 2 -> 2 hour /sec
+                         * 3 -> 1 day /sec
+                         * 4 -> 2 day /sec
+                         * 5 -> 1 month /sec
+                         */
+                        play_speed = val;
+                    }
+                    last_update = Instant::now();
+                    break;
+                }
                 //n秒(Duration d)待って処理を実行
                 if let Ok(val) = receiver.try_recv() {
                     //もし途中で新しい速度になったらやり直し
@@ -59,91 +149,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if d < wait {
                         wait = d
                     }
-                    println!("waiting:{:?}", d,);
+                    // println!("waiting:{:?}", d);
                     spin_sleep::sleep(wait);
                     d -= wait;
                 } else {
-                    println!("処理を実行(前回:{:?}前)", last_update.elapsed());
+                    println!(
+                        "処理を実行(前回:{:?}前),time:{}",
+                        last_update.elapsed(),
+                        TIMESTAMP.try_lock().expect("lock faild")
+                    );
 
                     last_update = Instant::now();
                     //処理を実行
-                    time += 1;
-                    spin_sleep::sleep(Duration::from_millis(50));
+                    if let Ok(newTime) = game_manager.execute(play_speed) {
+                        if let Some(mut t) = TIMESTAMP.try_lock_for(Duration::from_millis(1000)) {
+                            *t = newTime
+                        }
+                        //  = newTime;
+                    }
+
                     break;
                 }
             }
         }
     });
-
-    // tokio::spawn(async move {
-    //     sender.send(1).await;
-
-    //     spin_sleep::sleep(Duration::from_millis(1000));
-
-    //     sender.send(3).await;
-    //     // tokio::time::sleep(Duration::from_millis(5000)).await;
-    //     // sender.send(1).await;
-    //     // tokio::time::sleep(Duration::from_millis(5000)).await;
-    //     sender.send(0).await;
-
-    //     //     let mut sum = Duration::ZERO;
-    //     //     let mut i = 0;
-    //     //     let mut avg = Duration::ZERO;
-    //     //     let mut frame = Duration::from_micros(16600);
-    //     //     let t_avg = frame.to_owned();
-    //     //     println!("\x1B[2J");
-
-    //     //     loop {
-    //     //         i += 1;
-    //     //         let i_t = Instant::now();
-    //     //         spin_sleep::sleep(frame);
-    //     //         sum += i_t.elapsed();
-    //     //         avg = sum / (i + 1);
-    //     //         println!("\x1B[1;1Hduration:{:?},平均:{:?}", i_t.elapsed(), avg);
-    //     //         if avg.as_micros().abs_diff(t_avg.as_micros()) < 100 {
-    //     //             if avg.as_micros().abs_diff(t_avg.as_micros()) < 20 {
-    //     //                 if avg.as_micros().abs_diff(t_avg.as_micros()) < 5{
-    //     //                     println!("\x1B[2;12Kgood value!,F:{:?}", frame);
-    //     //                 } else {
-    //     //                     println!("\x1B[2;12Kalmost good value!,F:{:?}", frame);
-    //     //                     if t_avg < avg {
-    //     //                         frame -= (avg - t_avg) / 100000
-    //     //                     } else {
-    //     //                         frame += (t_avg - avg) / 100000
-    //     //                     }
-    //     //                 }                } else {
-    //     //                 println!("\x1B[2;12Knot bad value!,F:{:?}", frame);
-    //     //                 if t_avg < avg {
-    //     //                     frame -= (avg - t_avg) / 1000
-    //     //                 } else {
-    //     //                     frame += (t_avg - avg) / 1000
-    //     //                 }
-    //     //             }
-    //     //         } else {
-    //     //             println!("\x1B[2;12Kbad value,F:{:?}", frame);
-    //     //             if t_avg < avg {
-    //     //                 frame -= (avg - t_avg) / 10
-    //     //             } else {
-    //     //                 frame += (t_avg - avg) / 10
-    //     //             }
-    //     //         }
-
-    //     //         if i > 999999 {
-    //     //             println!("Break!");
-    //     //             break;
-    //     //         }
-    //     //     }
-
-    //     //     // メインスレッドへメッセージの送信
-    //     //     // sender2.send("hi".to_string()).unwrap();
-    // });
-    // let val = String::from("hi");
-
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![play_speed_update])
         .setup(|app| {
-            let app_handle = app.app_handle();
-            app.manage(app_handle);
+            // let app_handle = app.app_handle();
+            // app.manage(app_handle);
             app.manage(sqlite_pool);
             app.manage(sender);
             Ok(())
