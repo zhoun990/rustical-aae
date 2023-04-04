@@ -53,6 +53,9 @@ CREATE TABLE
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         product TEXT NOT NULL,
+        --mapId TEXT NOT NULL,
+        position_x INTEGER NOT NULL,
+        position_y INTEGER NOT NULL,
         country_id INTEGER,
         FOREIGN KEY (country_id) REFERENCES countries (id)
     );

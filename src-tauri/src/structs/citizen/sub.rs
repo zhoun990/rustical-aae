@@ -5,7 +5,22 @@ pub(super) struct Option {
     pub name: String,
     pub weight: i32,
 }
-
+pub(super) fn get_n(x: i32, minX: i32, maxX: i32, midX: i32, midN: f32) -> f32 {
+    match x {
+        _ if x <= minX => 0.1,
+        _ if x <= midX => (midN - 0.1) * (x - minX) as f32 / (midX - minX) as f32 + 0.1,
+        _ if x <= maxX => (0.9 - midN) * (x - midX) as f32 / (maxX - midX) as f32 + midN,
+        _ => 0.9,
+    }
+}
+pub(super) fn get_change_relationship_value(x: f32) -> f32 {
+    let x = f32::abs(x);
+    if x <= 100.0 {
+        (100.0 * f32::exp(-0.023 * x)).round() / 5.0
+    } else {
+        2.0
+    }
+}
 pub(super) fn make_decision(options: &[Option]) -> Option {
     let tournament_size = options.len() / 2;
     let mut tournament = Vec::with_capacity(tournament_size);
