@@ -1,4 +1,6 @@
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
+use rspc::Type;
 use serde::{Deserialize, Serialize};
 use sqlx::{
     sqlite::{SqliteConnectOptions, SqliteJournalMode},
@@ -9,9 +11,11 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use typeshare::typeshare;
 
-use crate::getPool;
+use crate::{game_manager::GAME_MANAGER, getPool};
+
+use super::HandleGameManager;
 #[typeshare]
-#[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow, Clone, Type)]
 pub struct Region {
     pub id: i32,
     pub name: String,
@@ -31,21 +35,17 @@ impl Region {
     async fn add_to_db(&mut self) -> sqlx::Result<()> {
         let pool = &getPool();
         let mut tx = pool.begin().await?;
-        let result =
-            sqlx::query("INSERT INTO regions (id, name, position_x, position_y, product, country_id) VALUES (?, ?, ?, ?, ?, ?)")
-               .bind(if self.id != 0 {Some(&self.id)} else {None})
-                .bind(&self.name)
-                .bind(&self.position_x)
-                .bind(&self.position_y)
-                .bind(&self.product)
-                .bind(&self.country_id)
-                .execute(&mut tx)
-                .await?;
-
+        const SQL: &str = "INSERT INTO regions (id, name, position_x, position_y, product, country_id) VALUES (?, ?, ?, ?, ?, ?)";
+        let result = sqlx::query(SQL)
+            .bind(if self.id != 0 { Some(&self.id) } else { None })
+            .bind(&self.name)
+            .bind(&self.position_x)
+            .bind(&self.position_y)
+            .bind(&self.product)
+            .bind(&self.country_id)
+            .execute(&mut tx)
+            .await?;
         tx.commit().await?;
-        println!("id b:{}", self.id);
-        println!("id a:{}", result.last_insert_rowid());
-
         self.id = result.last_insert_rowid() as i32;
 
         Ok(())
@@ -72,5 +72,29 @@ impl Region {
             })
             .collect::<HashMap<i32, Arc<Mutex<Self>>>>();
         Ok(map)
+    }
+}
+#[async_trait]
+impl HandleGameManager for Region {
+    async fn update(self) -> Result<()> {
+        let gm = GAME_MANAGER.lock().await;
+        if let Some(st) = gm.regions.get(&self.id) {
+            let mut st = st.lock().await;
+
+            let pool = &getPool();
+            let mut tx = pool.begin().await?;
+            sqlx::query("UPDATE regions SET name = ?, product = ?, country_id = ? WHERE id = ?")
+                .bind(&self.name)
+                .bind(&self.product)
+                .bind(&self.country_id)
+                .bind(&self.id)
+                .execute(&mut tx)
+                .await?;
+
+            tx.commit().await?;
+            *st = self;
+            return Ok(());
+        };
+        Err(anyhow!("citizen is not exists in gm"))
     }
 }

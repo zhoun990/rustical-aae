@@ -54,7 +54,7 @@ export class N {
 	 */
 	static round(value: number, precision = 1) {
 		const multiplier = Math.pow(10, precision);
-		return Math.round(value * multiplier) / multiplier;
+		return Math.round(value * multiplier) / multiplier || 0;
 	}
 	/**
 	 * 指定された桁数で数値を書式化する。

@@ -70,3 +70,34 @@ CREATE TABLE
         capital_city_id INTEGER NOT NULL,
         FOREIGN KEY (capital_city_id) REFERENCES cities (id)
     );
+
+-- インベントリーのテーブルを作成する
+CREATE TABLE
+    IF NOT EXISTS items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        count INTEGER NOT NULL,
+        owner_citizen_id INTEGER,
+        owner_city_id INTEGER,
+        owner_country_id INTEGER,
+        FOREIGN KEY (owner_citizen_id) REFERENCES citizens (id),
+        FOREIGN KEY (owner_city_id) REFERENCES cities (id),
+        FOREIGN KEY (owner_country_id) REFERENCES countries (id),
+        CONSTRAINT check_owner CHECK (
+            (
+                owner_citizen_id IS NOT NULL
+                AND owner_city_id IS NULL
+                AND owner_country_id IS NULL
+            )
+            OR (
+                owner_citizen_id IS NULL
+                AND owner_city_id IS NOT NULL
+                AND owner_country_id IS NULL
+            )
+            OR (
+                owner_citizen_id IS NULL
+                AND owner_city_id IS NULL
+                AND owner_country_id IS NOT NULL
+            )
+        )
+    );

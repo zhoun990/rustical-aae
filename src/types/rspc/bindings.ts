@@ -4,9 +4,39 @@
 export type Procedures = {
     queries: 
         { key: "app.getGameData", input: never, result: [string, string][] } | 
+        { key: "app.initGame", input: { [key: number]: Region }, result: null } | 
         { key: "app.playSpeedUpdate", input: number, result: null } | 
         { key: "app.refresh", input: never, result: null } | 
-        { key: "app.selectGameId", input: string | null, result: null },
-    mutations: never,
-    subscriptions: never
+        { key: "app.selectGameId", input: string | null, result: null } | 
+        { key: "app.updateCitizen", input: Citizen, result: null } | 
+        { key: "app.updateCity", input: City, result: null } | 
+        { key: "app.updateRegion", input: Region, result: null },
+    mutations: 
+        { key: "app.gameId", input: never, result: string } | 
+        { key: "app.gameManager", input: never, result: GameData },
+    subscriptions: 
+        { key: "app.gameId", input: never, result: Igniter } | 
+        { key: "app.gameManager", input: never, result: Igniter }
 };
+
+export type Gender = "Male" | "Female"
+
+export type ItemOwner = { Citizen: number } | { City: number } | { Country: number } | "None"
+
+export type Relation = { id: number; name: string; impression: number; relation_type: RelationType; last_met_timestamp: number }
+
+export type RelationType = "Child" | "Parent" | "Sibling" | "Partner" | "Acquaintance" | "Clan"
+
+export type City = { id: number; name: string; position_x: number; position_y: number; dev_production: number; dev_building: number; dev_infrastructure: number; exp_dev_production: number; exp_dev_building: number; exp_dev_infrastructure: number; control: number; environment: number; region_id: number; country_id: number | null }
+
+export type Igniter = "GameId" | "GameData"
+
+export type Region = { id: number; name: string; product: string; country_id: number | null; position_x: number; position_y: number }
+
+export type GameData = { game_id: string; citizens: [number, Citizen][]; cities: [number, City][]; regions: [number, Region][]; items: [number, Item][]; timestamp: number }
+
+export type ItemName = "Food" | "Resource" | "Weapon" | "Money"
+
+export type Item = { count: number; id: number; name: ItemName; owner: ItemOwner }
+
+export type Citizen = { id: number; name: string; born_timestamp: number; death_timestamp: number | null; gender: Gender; job: string | null; staying_city_id: number; home_city_id: number; country_id: number | null; relations: { [key: number]: Relation } }

@@ -1,11 +1,7 @@
-import { useEffect, useState } from "react";
-import reactLogo from "./assets/react.svg";
-// import { invoke } from "@tauri-apps/api/tauri";
+import { useContext, useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
-
 import "./App.css";
 import { Tooltip } from "./components/Interface/Tooltip";
-import { Citizen, City, Region } from "../typeshare";
 import { fs, path } from "@tauri-apps/api";
 import { MapRenderer } from "./core/MapRenderer";
 import { relaunch } from "@tauri-apps/api/process";
@@ -13,19 +9,35 @@ import { date } from "./utils/date";
 import { MapData } from "./types/MapData";
 import { genMapData } from "./utils/genMapData";
 import { SavedData } from "./components/SavedData";
-import { client } from "./client";
+import {
+	client,
+	useMutation,
+	useMutationState,
+	useSubscription,
+} from "./client";
+import { Store } from "./store";
+import { InfoPanel } from "./components/InfoPanel";
+import { Citizen, City, Region } from "./types/rspc/bindings";
 
 export let mapSource: MapData = new Map();
 function App() {
+	const { regions, timestamp, set } = useContext(Store);
+
 	const [pause, setPause] = useState(true);
 	const [speed, setSpeed] = useState(1);
-	const [gameId, setGameId] = useState("");
-	// const [mapData, mapData=] = useState<MapData>(new Map());
-	const [citizens, setCitizens] = useState(new Map<number, Citizen>());
-	const [cities, setCities] = useState(new Map<number, City>());
-	const [regions, setRegions] = useState(new Map<number, Region>());
-	const [timestamp, setTimestamp] = useState(0);
-
+	const [gameId, setGameId] = useMutationState("app.gameId", "app.gameId");
+	const [gameData, setGameData] = useMutationState(
+		"app.gameManager",
+		"app.gameManager"
+	);
+	// const [msg, sendMsg] = useMutationState("app.sendMsg");
+	// const { mutate, data, isLoading, error } = useMutation("app.sendMsg");
+	const handleSubmit = async (
+		event: React.FormEvent<HTMLFormElement>
+	): Promise<void> => {
+		event.preventDefault();
+		// sendMsg();
+	};
 	const handlePause = (bool: boolean) => {
 		console.log("^_^ Log \n file: App.tsx:140 \n bool:", bool);
 		setPause(bool);
@@ -34,7 +46,6 @@ function App() {
 	async function handleSpeed(n: number) {
 		console.log("^_^ Log \n file: App.tsx:145 \n n:", n);
 		// Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-		// await invoke("play_speed_update", { speed: n });
 		client.query(["app.playSpeedUpdate", n]).then((res) => {
 			console.log(res);
 		});
@@ -44,36 +55,47 @@ function App() {
 		}
 	}
 	useEffect(() => {
-		console.log({ a: regions, b: mapSource });
-	}, [regions]);
+		if (gameData) {
+			console.log("^_^ Log \n file: App.tsx:59 \n gameData:", gameData);
+			set({
+				citizens: new Map(gameData.citizens),
+				cities: new Map(gameData.cities),
+				regions: new Map(gameData.regions),
+				timestamp: gameData.timestamp,
+			});
+		}
+	}, [gameData]);
 	useEffect(() => {
 		genMapData().then((map) => {
 			mapSource = map;
-			// invoke("refresh");
 			client.query(["app.refresh"]);
+			setGameData(undefined);
+			setGameId(undefined);
 		});
-		listen("set_game_id", ({ event, payload }) => {
-			setGameId(payload as string);
-		});
-		listen(
-			"game_data",
-			({
-				payload,
-			}: {
-				payload: {
-					game_id: string;
-					citizens: [number, Citizen][];
-					cities: [number, City][];
-					regions: [number, Region][];
-					timestamp: number;
-				};
-			}) => {
-				setCitizens(new Map(payload.citizens));
-				setCities(new Map(payload.cities));
-				setRegions(new Map(payload.regions));
-				setTimestamp(payload.timestamp);
-			}
-		);
+		// listen("set_game_id", ({ event, payload }) => {
+		// 	setGameId(payload as string);
+		// });
+		// listen(
+		// 	"game_data",
+		// 	({
+		// 		payload,
+		// 	}: {
+		// 		payload: {
+		// 			game_id: string;
+		// 			citizens: [number, Citizen][];
+		// 			cities: [number, City][];
+		// 			regions: [number, Region][];
+		// 			timestamp: number;
+		// 		};
+		// 	}) => {
+		// 		set({
+		// 			citizens: new Map(payload.citizens),
+		// 			cities: new Map(payload.cities),
+		// 			regions: new Map(payload.regions),
+		// 			timestamp: payload.timestamp,
+		// 		});
+		// 	}
+		// );
 		// MAP_DATA.forEach((value, key) => {});
 		const handleKey = (event: KeyboardEvent) => {
 			switch (event.key) {
@@ -119,9 +141,10 @@ function App() {
 			window.removeEventListener("keydown", handleKey);
 		};
 	}, []);
+
 	if (gameId)
 		return (
-			<MapRenderer regions={regions} timestamp={timestamp}>
+			<MapRenderer>
 				<div className="fixed top-10 left-10">
 					<h1>AAE</h1>
 					<div className="fixed top-0 right-0 text-lg text-white bg-gray-400 p-3">
@@ -154,14 +177,23 @@ function App() {
 					</div>
 					<div>{mapSource.size}</div>
 				</div>
+				<InfoPanel />
 			</MapRenderer>
 		);
 	return (
 		<div className="flex items-center justify-center h-full flex-col">
+			{/* <form onSubmit={handleSubmit}>
+				<input
+					type="text"
+					name="message"
+					placeholder="Your message"
+					defaultValue="Hello from the client!"
+				/>
+				<button>Submit</button>
+			</form> */}
 			<div
 				className="m-2 p-2 border rounded-lg text-2xl mt-10"
 				onClick={() => {
-					// invoke("select_game_id", { gameId: null });
 					client.query(["app.selectGameId", null]);
 				}}
 			>
@@ -178,14 +210,12 @@ function App() {
 							product: "",
 							position_x: v.position.x,
 							position_y: v.position.y,
+							country_id: null,
 						};
 						map[k] = r;
 					});
-					// invoke("init_game", {
-					// 	regions: map,
-					// });
-					// client.query(["app.initGame", map]);
 
+					client.query(["app.initGame", map]);
 				}}
 			>
 				Init and New Game

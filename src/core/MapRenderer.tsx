@@ -1,9 +1,11 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
-import { Region } from "../../typeshare";
+import { ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { mapSource } from "../App";
 import { N } from "../utils/NumericUtils";
 import { relaunch } from "@tauri-apps/api/process";
 import { invoke } from "@tauri-apps/api/tauri";
+import { Store, actions } from "../store";
+import { Region } from "../types/rspc/bindings";
+let i = 0;
 
 const STEP = [
 	1600, 1300, 1000, 800, 700, 600, 550, 500, 450, 400, 350, 300, 250, 200, 170,
@@ -16,9 +18,8 @@ const exponential = (n: number) => 2 ** ((1 - n) * 10) / 2 ** 10;
 
 export const MapRenderer: React.FC<{
 	children?: ReactNode;
-	regions: Map<number, Region>;
-	timestamp: number;
-}> = ({ regions, children,timestamp }) => {
+}> = ({ children }) => {
+	const { focus, set, regions, timestamp } = useContext(Store);
 	const ref = useRef<SVGSVGElement>(null);
 	const mapRef = useRef({
 		w: WIDTH,
@@ -36,6 +37,9 @@ export const MapRenderer: React.FC<{
 		wheelDown: false,
 		leftDown: false,
 	});
+	useEffect(() => {
+		console.log({ focus });
+	}, [focus]);
 	useEffect(() => {
 		mapRef.current = Object.assign({}, mapData);
 	}, [mapData]);
@@ -335,9 +339,11 @@ export const MapRenderer: React.FC<{
 				className="fixed flex-none border"
 				style={{ left: mapData.x, top: mapData.y }}
 				ref={ref}
-				// onClick={() => {
-				// 	GameManager.set("focus", { type: null, id: "" });
-				// }}
+				onClick={() => {
+					set({
+						focus: { type: null, id: null },
+					});
+				}}
 			>
 				{Array.from(regions.values())
 					.sort((a, b) => a.id - b.id)
@@ -348,7 +354,26 @@ export const MapRenderer: React.FC<{
 								key={i}
 								d={map?.d}
 								fill={map?.fill}
-								stroke={map?.stroke}
+								stroke={region.id === focus.id ? "#848600" : map?.stroke}
+								strokeWidth={region.id === focus.id ? 5 : 1}
+								onClick={(e) => {
+									e.stopPropagation();
+									set({
+										focus: (value) =>
+											region.id === value.id
+												? { type: null, id: null }
+												: { type: "state", id: region.id },
+									});
+								}}
+								// onContextMenu={() => {
+								// 	const country =
+								// 		settlements[region.settlements[0]].country;
+								// 	if (country)
+								// 		GameManager.set("focus", {
+								// 			type: "country",
+								// 			id: country,
+								// 		});
+								// }}
 							></path>
 						);
 					})}

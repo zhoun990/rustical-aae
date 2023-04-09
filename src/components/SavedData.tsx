@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { client } from "../client";
-// import { invoke } from "@tauri-apps/api/tauri";
 
 export const SavedData = () => {
 	const [saves, setSaves] = useState<Array<string[]>>([]);
@@ -25,9 +24,6 @@ export const SavedData = () => {
 					className="m-2 p-2 border rounded-lg text-2xl"
 					onClick={() => {
 						client.query(["app.selectGameId", id[0]]);
-						// invoke("select_game_id", {
-						// 	gameId: id[0],
-						// });
 					}}
 				>
 					{id[0]}

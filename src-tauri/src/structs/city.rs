@@ -1,14 +1,19 @@
 use anyhow::{anyhow, Error, Result};
+use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
+use rspc::Type;
 use serde::{Deserialize, Serialize};
-use typeshare::typeshare;
 use std::collections::HashMap;
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
+use typeshare::typeshare;
 
+use crate::game_manager::GAME_MANAGER;
 use crate::getPool;
+
+use super::HandleGameManager;
 #[typeshare]
-#[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow, Clone, Type)]
 pub struct City {
     pub id: i32,
     pub name: String,
@@ -25,7 +30,6 @@ pub struct City {
     pub region_id: i32,
     pub country_id: Option<i32>,
 }
-
 impl City {
     /// 引数のFnでデフォルトから変更可
     pub async fn new<F: FnOnce(&mut Self) -> ()>(f: F) -> Result<Self> {
@@ -94,5 +98,39 @@ impl City {
             })
             .collect::<HashMap<i32, Arc<Mutex<Self>>>>();
         Ok(map)
+    }
+}
+#[async_trait]
+impl HandleGameManager for City {
+    async fn update(self) -> Result<()> {
+        let gm = GAME_MANAGER.lock().await;
+        if let Some(st) = gm.cities.get(&self.id) {
+            let mut st = st.lock().await;
+
+            let pool = &getPool();
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "UPDATE cities SET name = ?, dev_production = ?, dev_building = ?,
+                dev_infrastructure = ?, exp_dev_production = ?, exp_dev_building = ?, exp_dev_infrastructure = ?, control = ?, environment = ?,country_id = ? WHERE id = ?"
+            )
+            .bind(&self.name)
+            .bind(&self.dev_production)
+            .bind(&self.dev_building)
+            .bind(&self.dev_infrastructure)
+            .bind(&self.exp_dev_production)
+            .bind(&self.exp_dev_building)
+            .bind(&self.exp_dev_infrastructure)
+            .bind(&self.control)
+            .bind(&self.environment)
+            .bind(&self.country_id)
+            .bind(&self.id)
+            .execute(&mut tx)
+            .await?;
+
+            tx.commit().await?;
+            *st = self;
+            return Ok(());
+        };
+        Err(anyhow!("citizen is not exists in gm"))
     }
 }

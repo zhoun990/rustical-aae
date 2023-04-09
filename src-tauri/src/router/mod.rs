@@ -1,16 +1,40 @@
+use chrono::{DateTime, Local};
 use parking_lot::{RawMutex, RwLock};
-use std::{collections::HashMap, sync::Arc};
+use rspc::Type;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 
 use crate::structs::region::Region;
-mod app;
 
+mod app;
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize, Type)]
+pub enum Igniter {
+    GameId,
+    GameData,
+}
+
+// impl Igniter {
+//     pub fn from_string(s: &str) -> Result<Self, String> {
+//         match s {
+//             "GameId" => Ok(Igniter::GameId),
+//             "GameData" => Ok(Igniter::GameData),
+//             _ => Err(format!("無効な文字列です：{}", s)),
+//         }
+//     }
+// }
 #[derive(Clone)]
 pub struct Ctx {
     pub refresh_counter: Arc<RwLock<i32>>,
     pub sender_init_game: Sender<HashMap<i32, Region>>,
     pub sender_game_id: Sender<Option<String>>,
-    pub sender: Sender<u8>
+    // pub sender_set_game_id: Arc<Mutex<std::sync::mpsc::Sender<Sender<()>>>>,
+    // pub sender_set_game_manager: Arc<Mutex<std::sync::mpsc::Sender<Sender<()>>>>,
+    pub sender_stream: Arc<Mutex<std::sync::mpsc::Sender<Sender<Igniter>>>>,
+    pub sender: Sender<u8>,
 }
 
 pub type Router = rspc::Router<Ctx>;

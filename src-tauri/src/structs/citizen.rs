@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Error, Result};
+use async_trait::async_trait;
 use futures::{StreamExt, TryStreamExt};
 use parking_lot::lock_api::MutexGuard;
 use parking_lot::{RawMutex, RwLock};
@@ -14,6 +15,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use typeshare::typeshare;
 
+use crate::game_manager::GAME_MANAGER;
 use crate::{db, getPool};
 use crate::{
     utils::{percentage, random},
@@ -21,10 +23,12 @@ use crate::{
 };
 // use crate::citizen::sub::make_decision;
 pub(crate) mod sub;
+use rspc::Type;
+
+use super::HandleGameManager;
 
 // use crate::utils;
-#[typeshare]
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Type)]
 pub struct Citizen {
     pub id: i32,
     pub name: String,
@@ -37,8 +41,7 @@ pub struct Citizen {
     pub country_id: Option<i32>,
     pub relations: HashMap<i32, Relation>,
 }
-#[typeshare]
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone, Type)]
 pub struct Relation {
     pub id: i32,
     pub name: String,
@@ -46,8 +49,8 @@ pub struct Relation {
     pub relation_type: RelationType,
     pub last_met_timestamp: u32,
 }
-#[typeshare]
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone, Type)]
 pub enum RelationType {
     Child,
     Parent,
@@ -56,8 +59,7 @@ pub enum RelationType {
     Acquaintance,
     Clan,
 }
-#[typeshare]
-#[derive(PartialEq, Debug, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Debug, Serialize, Deserialize, Clone, Type)]
 pub enum Gender {
     Male,
     Female,
@@ -481,6 +483,17 @@ impl RelationType {
             Self::Clan
         }
     }
+    pub fn to_string(&self) -> String {
+        match self {
+            RelationType::Child => "Child",
+            RelationType::Parent => "Parent",
+            RelationType::Sibling => "Sibling",
+            RelationType::Partner => "Partner",
+            RelationType::Acquaintance => "Acquaintance",
+            RelationType::Clan => "Clan",
+        }
+        .to_string()
+    }
 }
 // #[cfg(test)]
 // mod test;
@@ -489,3 +502,47 @@ impl RelationType {
 //     println!("citizen{:?}", c);
 //     assert!(true);
 // }
+#[async_trait]
+impl HandleGameManager for Citizen {
+    async fn update(self) -> Result<()> {
+        let gm = GAME_MANAGER.lock().await;
+        if let Some(citizen) = gm.citizens.get(&self.id) {
+            let mut citizen = citizen.lock().await;
+
+            let pool = &getPool();
+            let mut tx = pool.begin().await?;
+            sqlx::query(
+                "UPDATE citizens SET name = ?, death_timestamp = ?, job = ?, staying_city_id = ?, home_city_id = ?, country_id = ? WHERE id = ?",
+            )
+            .bind(&self.name)
+            .bind(&self.death_timestamp)
+            .bind(&self.job)
+            .bind(&self.staying_city_id)
+            .bind(&self.home_city_id)
+            .bind(&self.country_id)
+            .bind(&self.id)
+            .execute(&mut tx)
+            .await?;
+
+            for (target_id, relation) in &self.relations {
+                let old_relation = &citizen.relations[target_id];
+                if relation.impression != old_relation.impression
+                    || relation.relation_type != old_relation.relation_type
+                {
+                    sqlx::query(
+                        "UPDATE relationships SET impression = ?, relation_type = ? WHERE id = ?",
+                    )
+                    .bind(relation.impression)
+                    .bind(relation.relation_type.to_string())
+                    .bind(&relation.id)
+                    .execute(&mut tx)
+                    .await?;
+                }
+            }
+            tx.commit().await?;
+            *citizen = self;
+            return Ok(());
+        };
+        Err(anyhow!("citizen is not exists in gm"))
+    }
+}

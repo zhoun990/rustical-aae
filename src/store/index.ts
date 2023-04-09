@@ -3,7 +3,6 @@ import { initialState } from "./InitialState";
 import { createSlice } from "./createSlice";
 import { clone } from "../utils/rfdc";
 import { InitialState } from "./InitialState";
-export const SIGHT = 8;
 
 const slice = createSlice({
 	initialState,
@@ -24,7 +23,6 @@ const slice = createSlice({
 				if (typeof cb == "function") {
 					try {
 						state[key] = cb(clone(state[key]));
-						console.warn("should use GameManager.set", key);
 					} catch (err) {
 						console.error({ key, value: state[key], err });
 					}
