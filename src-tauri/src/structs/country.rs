@@ -16,15 +16,14 @@ use crate::{game_manager::GAME_MANAGER, getPool};
 use super::HandleGameManager;
 #[typeshare]
 #[derive(Debug, Serialize, Deserialize, Default, sqlx::FromRow, Clone, Type)]
-pub struct Region {
+pub struct Country {
     pub id: i32,
     pub name: String,
-    pub product: String,
-    // pub country_id: Option<i32>,
-    pub position_x: i32,
-    pub position_y: i32,
+    pub color_primary: String,
+    pub color_secondary: String,
+    pub capital_city_id: i32,
 }
-impl Region {
+impl Country {
     /// 引数のFnでデフォルトから変更可
     pub async fn new<F: FnOnce(&mut Self) -> ()>(f: F) -> Result<Self> {
         let mut s = Self::default();
@@ -35,14 +34,12 @@ impl Region {
     async fn add_to_db(&mut self) -> sqlx::Result<()> {
         let pool = &getPool();
         let mut tx = pool.begin().await?;
-        const SQL: &str = "INSERT INTO regions (id, name, position_x, position_y, product) VALUES (?, ?, ?, ?, ?)";
+        const SQL: &str = "INSERT INTO countries (name, color_primary, color_secondary, capital_city_id) VALUES (?, ?, ?, ?)";
         let result = sqlx::query(SQL)
-            .bind(if self.id != 0 { Some(&self.id) } else { None })
             .bind(&self.name)
-            .bind(&self.position_x)
-            .bind(&self.position_y)
-            .bind(&self.product)
-            // .bind(&self.country_id)
+            .bind(&self.color_primary)
+            .bind(&self.color_secondary)
+            .bind(&self.capital_city_id)
             .execute(&mut tx)
             .await?;
         tx.commit().await?;
@@ -52,7 +49,7 @@ impl Region {
     }
     pub async fn get_from_db() -> sqlx::Result<HashMap<i32, Arc<Mutex<Self>>>> {
         let pool = &getPool();
-        let raw = sqlx::query_as::<_, Self>("SELECT * FROM regions")
+        let raw = sqlx::query_as::<_, Self>("SELECT * FROM countries")
             .fetch_all(pool)
             .await?;
         let map = raw
@@ -63,10 +60,9 @@ impl Region {
                     Arc::new(Mutex::new(Self {
                         id: x.id,
                         name: x.name.to_string(),
-                        product: x.product.to_string(),
-                        // country_id: x.country_id,
-                        position_x: x.position_x,
-                        position_y: x.position_y,
+                        color_primary: x.color_primary.to_string(),
+                        color_secondary: x.color_secondary.to_string(),
+                        capital_city_id: x.capital_city_id,
                     })),
                 )
             })
@@ -75,10 +71,10 @@ impl Region {
     }
 }
 #[async_trait]
-impl HandleGameManager for Region {
+impl HandleGameManager for Country {
     async fn update_gm(self) -> Result<()> {
         let gm = GAME_MANAGER.lock().await;
-        if let Some(st) = gm.regions.get(&self.id) {
+        if let Some(st) = gm.countries.get(&self.id) {
             let mut st = st.lock().await;
             self.update_db().await.unwrap();
             *st = self;
@@ -89,13 +85,15 @@ impl HandleGameManager for Region {
     async fn update_db(&self) -> Result<()> {
         let pool = &getPool();
         let mut tx = pool.begin().await?;
-        sqlx::query("UPDATE regions SET name = ?, product = ? WHERE id = ?")
-            .bind(&self.name)
-            .bind(&self.product)
-            // .bind(&self.country_id)
-            .bind(&self.id)
-            .execute(&mut tx)
-            .await?;
+        sqlx::query("UPDATE countries SET name = ?, color_primary = ?, color_secondary = ?, capital_city_id = ? WHERE id = ?")
+                .bind(&self.name)
+                .bind(&self.color_primary)
+                .bind(&self.color_secondary)
+                .bind(&self.capital_city_id)
+                .bind(&self.id)
+                .execute(&mut tx)
+                .await?;
+
         tx.commit().await?;
         Ok(())
     }

@@ -1,7 +1,7 @@
-import { client } from "../client";
-import { store } from "../main";
-import { City } from "../types/rspc/bindings";
-import { GameCache } from "../utils/GameCache";
+import { client } from "../../client";
+import { store } from "../../main";
+import { City } from "../../types/rspc/bindings";
+import { GameCache } from "../../utils/GameCache";
 import { CitizenClass } from "./Citizren";
 import { RegionClass } from "./Region";
 

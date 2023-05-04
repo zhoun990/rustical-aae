@@ -20,15 +20,15 @@
 			"fs": {
 				"all": false,
 				"copyFile": false,
-				"createDir": false,
+				"createDir": true,
 				"exists": false,
-				"readDir": false,
+				"readDir": true,
 				"readFile": true,
 				"removeDir": false,
 				"removeFile": false,
 				"renameFile": false,
 				"scope": [],
-				"writeFile": false
+				"writeFile": true
 			},
 			"dialog": {
 				"all": false,

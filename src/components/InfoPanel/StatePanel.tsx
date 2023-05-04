@@ -2,11 +2,11 @@ import { Tab } from "@headlessui/react";
 import { FC, useContext, useEffect, useState } from "react";
 import { Store } from "../../store";
 import { Tooltip } from "../Interface/Tooltip";
-import { RegionClass } from "../../core/Region";
+import { RegionClass } from "../core/Region";
 import { classNames } from "../../utils/classNames";
 import { N } from "../../utils/NumericUtils";
 import { CITY_NAME_LIST } from "../../utils/constans";
-import { CityClass } from "../../core/City";
+import { CityClass } from "../core/City";
 // import { Configuration, OpenAIApi } from "openai";
 
 export const StatePanel: FC<{ editable?: boolean }> = ({ editable }) => {
@@ -531,6 +531,8 @@ Popover Popover Popover Popover Popover Popover
 									/>
 									|age:
 									{citizen.age}
+									|money:
+									{citizen.self.money}
 									<button
 										className="border px-1"
 										onClick={() => {

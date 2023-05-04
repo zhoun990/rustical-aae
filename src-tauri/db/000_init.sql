@@ -10,6 +10,11 @@ CREATE TABLE
         staying_city_id INTEGER NOT NULL,
         home_city_id INTEGER NOT NULL,
         country_id INTEGER,
+        level INTEGER NOT NULL,
+        rank INTEGER NOT NULL,
+        exp INTEGER NOT NULL,
+        skill_points INTEGER NOT NULL,
+        money INTEGER NOT NULL,
         FOREIGN KEY (staying_city_id) REFERENCES cities (id),
         FOREIGN KEY (home_city_id) REFERENCES cities (id),
         FOREIGN KEY (country_id) REFERENCES countries (id)
@@ -55,9 +60,9 @@ CREATE TABLE
         product TEXT NOT NULL,
         --mapId TEXT NOT NULL,
         position_x INTEGER NOT NULL,
-        position_y INTEGER NOT NULL,
-        country_id INTEGER,
-        FOREIGN KEY (country_id) REFERENCES countries (id)
+        position_y INTEGER NOT NULL
+        -- country_id INTEGER,
+        -- FOREIGN KEY (country_id) REFERENCES countries (id)
     );
 
 -- 国のテーブルを作成する

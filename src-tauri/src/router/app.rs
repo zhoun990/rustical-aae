@@ -1,15 +1,19 @@
+use super::{Ctx, Igniter, RouterBuilder};
 use crate::{
-    game_manager::{GameData, GAME_MANAGER},
-    structs::{citizen::Citizen, city::City, region::Region, HandleGameManager},
+    game_manager::{game_data::GameData, GAME_MANAGER},
+    structs::{
+        battle::{BattleState, Position},
+        citizen::Citizen,
+        city::City,
+        country::Country,
+        region::Region,
+        HandleGameManager,
+    },
 };
 use anyhow::{anyhow, Error, Result};
-use futures::{future, TryStreamExt};
-
-// use async_stream::stream;
 use chrono::{DateTime, Local, Utc};
 use futures::Stream;
-use tokio_stream::{self as stream, wrappers::ReceiverStream, StreamExt};
-// use spin_sleep::sleep;
+use futures::{future, TryStreamExt};
 use std::{
     collections::{BTreeMap, HashMap},
     fs::{self, metadata, File},
@@ -18,8 +22,8 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{sync::Mutex, time::sleep};
+use tokio_stream::{self as stream, wrappers::ReceiverStream, StreamExt};
 
-use super::{Ctx, Igniter, RouterBuilder};
 async fn play_speed_update(ctx: Ctx, speed: u8) {
     match ctx.sender.send(speed).await {
         Ok(_) => (),
@@ -46,23 +50,11 @@ fn refresh(ctx: Ctx, _: ()) {
 }
 
 async fn update<T: HandleGameManager>(_: Ctx, st: T) {
-    T::update(st).await.unwrap();
+    st.update_gm().await.unwrap();
 }
-// fn game_id_stream(ctx: Ctx, _: ()) -> impl Stream<Item = ()> {
-//     let (sender_set_game_id, receiver_set_game_id) = tokio::sync::mpsc::channel(100);
-//     let m = ctx.sender_set_game_id.lock().unwrap();
-//     m.send(sender_set_game_id).unwrap();
-//     ReceiverStream::from(receiver_set_game_id)
-// }
 async fn game_id(_: Ctx, _: ()) -> String {
     GAME_MANAGER.lock().await.game_id.to_string()
 }
-// fn game_manager_stream(ctx: Ctx, _: ()) -> impl Stream<Item = ()> {
-//     let (sender_set_game_manager, receiver_set_game_manager) = tokio::sync::mpsc::channel(100);
-//     let m = ctx.sender_set_game_manager.lock().unwrap();
-//     m.send(sender_set_game_manager).unwrap();
-//     ReceiverStream::from(receiver_set_game_manager)
-// }
 
 fn stream(ctx: Ctx, igniter_type: Igniter) -> impl Stream<Item = Igniter> {
     let (sender, receiver) = tokio::sync::mpsc::channel(100);
@@ -73,6 +65,35 @@ fn stream(ctx: Ctx, igniter_type: Igniter) -> impl Stream<Item = Igniter> {
 async fn game_manager(_: Ctx, _: ()) -> GameData {
     let gm = &*GAME_MANAGER.lock().await;
     GameData::from_game_manager(gm).await
+}
+async fn battle_move(_: Ctx, (from, to): (Position, Position)) -> BattleState {
+    let gm = &*GAME_MANAGER.lock().await;
+    let Some(battle) = gm.battles.get(&0) else { panic!("No battle") };
+    let mut battle = battle.lock().await;
+    battle.move_unit(from, to);
+    battle.end_round();
+    battle.clone()
+}
+async fn battle_get(_: Ctx, _: ()) -> BattleState {
+    let gm = &*GAME_MANAGER.lock().await;
+    let Some(battle) = gm.battles.get(&0) else { panic!("No battle") };
+    let battle = battle.lock().await;
+    println!("battle_get");
+    battle.clone()
+}
+async fn battle_get_possible_moves(_: Ctx, from: Position) -> Vec<Position> {
+    let gm = &*GAME_MANAGER.lock().await;
+    let Some(battle) = gm.battles.get(&0) else { panic!("No battle") };
+    let battle = battle.lock().await;
+    println!("battle_get");
+    battle.get_possible_moves(from)
+}
+async fn battle_get_possible_attacks(_: Ctx, from: Position) -> Vec<Position> {
+    let gm = &*GAME_MANAGER.lock().await;
+    let Some(battle) = gm.battles.get(&0) else { panic!("No battle") };
+    let battle = battle.lock().await;
+    println!("battle_get");
+    battle.get_possible_moves(from)
 }
 async fn get_game_data(_: Ctx, _: ()) -> Vec<(String, String)> {
     const DOCUMENTS_DIR: &str = "Documents";
@@ -138,8 +159,16 @@ pub(crate) fn mount() -> RouterBuilder {
             t(|ctx: Ctx, st: Region| update(ctx, st))
         })
         .query("updateCity", |t| t(|ctx: Ctx, st: City| update(ctx, st)))
+        .query("updateCountry", |t| {
+            t(|ctx: Ctx, st: Country| update(ctx, st))
+        })
         .query("getGameData", |t| t(get_game_data))
+        .query("battleGet", |t| t(battle_get))
+        .mutation("battleGetPossibleAttacks", |t| t(battle_get_possible_attacks))
+        .mutation("battleGetPossibleMoves", |t| t(battle_get_possible_moves))
+
         .mutation("gameId", |t| t(game_id))
+        .mutation("battleMove", |t| t(battle_move))
         .mutation("gameManager", |t| t(game_manager))
         .subscription("gameId", |t| {
             t(|ctx: Ctx, _: ()| stream(ctx, Igniter::GameId))

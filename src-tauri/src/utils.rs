@@ -1,9 +1,14 @@
+use rand::seq::SliceRandom;
 use rand::{thread_rng, Rng};
+
 pub fn random(min: i32, max: i32) -> i32 {
     thread_rng().gen_range(min..=max)
 }
 pub fn percentage(molecule: i32, denominator: i32) -> bool {
     thread_rng().gen_range(0..denominator) < molecule
+}
+pub fn pick<T: Copy>(items: Vec<T>) -> Option<T> {
+    items.choose(&mut thread_rng()).copied()
 }
 #[test]
 fn test_percentage_function() {

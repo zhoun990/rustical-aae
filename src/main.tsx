@@ -5,6 +5,7 @@ import "./styles.css";
 import { Store, actions, reducer } from "./store";
 import { InitialState, initialState } from "./store/InitialState";
 import { RSPCProvider, client, queryClient } from "./client";
+const isProd: boolean = process.env.NODE_ENV === "production";
 export let store = {
 	state: initialState,
 	set: (() => {}) as <T extends keyof InitialState>(value: {
@@ -33,6 +34,18 @@ const StoreProvider: FC<{ children: ReactNode }> = ({ children }) => {
 		</Store.Provider>
 	);
 };
+document.addEventListener("contextmenu", (event) => {
+	event.preventDefault();
+});
+//CSSで無効化済み
+// document.addEventListener("selectstart", (event) => {
+// 	event.preventDefault();
+// });
+document.addEventListener("keydown", (event) => {
+	if (isProd && (event.ctrlKey || event.metaKey)) {
+		event.preventDefault();
+	}
+});
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
 	<RSPCProvider client={client} queryClient={queryClient}>

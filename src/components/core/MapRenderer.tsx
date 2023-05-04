@@ -1,10 +1,10 @@
 import { ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { mapSource } from "../App";
-import { N } from "../utils/NumericUtils";
+import { mapSource } from "../../App";
+import { N } from "../../utils/NumericUtils";
 import { relaunch } from "@tauri-apps/api/process";
 import { invoke } from "@tauri-apps/api/tauri";
-import { Store, actions } from "../store";
-import { Region } from "../types/rspc/bindings";
+import { Store, actions } from "../../store";
+import { Region } from "../../types/rspc/bindings";
 let i = 0;
 
 const STEP = [
@@ -19,7 +19,8 @@ const exponential = (n: number) => 2 ** ((1 - n) * 10) / 2 ** 10;
 export const MapRenderer: React.FC<{
 	children?: ReactNode;
 }> = ({ children }) => {
-	const { focus, set, regions, timestamp } = useContext(Store);
+	const { focus, set, regions, cities, countries, timestamp } =
+		useContext(Store);
 	const ref = useRef<SVGSVGElement>(null);
 	const mapRef = useRef({
 		w: WIDTH,
@@ -349,13 +350,22 @@ export const MapRenderer: React.FC<{
 					.sort((a, b) => a.id - b.id)
 					.map((region, i) => {
 						const map = mapSource.get(region.id);
+						const strokeWidth = () => {
+							if (focus.type === "state") return region.id === focus.id ? 5 : 1;
+							const country = focus.id && countries.get(focus.id);
+							if (focus.type === "country" && country) {
+								const city = cities.get(country.capital_city_id);
+								return region.id === city?.region_id ? 5 : 1;
+							}
+							return 1;
+						};
 						return (
 							<path
 								key={i}
 								d={map?.d}
 								fill={map?.fill}
 								stroke={region.id === focus.id ? "#848600" : map?.stroke}
-								strokeWidth={region.id === focus.id ? 5 : 1}
+								strokeWidth={strokeWidth()}
 								onClick={(e) => {
 									e.stopPropagation();
 									set({
@@ -365,15 +375,22 @@ export const MapRenderer: React.FC<{
 												: { type: "state", id: region.id },
 									});
 								}}
-								// onContextMenu={() => {
-								// 	const country =
-								// 		settlements[region.settlements[0]].country;
-								// 	if (country)
-								// 		GameManager.set("focus", {
-								// 			type: "country",
-								// 			id: country,
-								// 		});
-								// }}
+								onContextMenu={() => {
+									const city = Array.from(cities.values()).find(
+										(v) => v.region_id === region.id
+									);
+									console.log(
+										"^_^ Log \n file: MapRenderer.tsx:370 \n region.country_id:",
+										city
+									);
+									if (city?.country_id)
+										set({
+											focus: {
+												type: "country",
+												id: city.country_id,
+											},
+										});
+								}}
 							></path>
 						);
 					})}

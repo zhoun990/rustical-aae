@@ -3,6 +3,7 @@
 
 export type Procedures = {
     queries: 
+        { key: "app.battleGet", input: never, result: BattleState } | 
         { key: "app.getGameData", input: never, result: [string, string][] } | 
         { key: "app.initGame", input: { [key: number]: Region }, result: null } | 
         { key: "app.playSpeedUpdate", input: number, result: null } | 
@@ -10,8 +11,12 @@ export type Procedures = {
         { key: "app.selectGameId", input: string | null, result: null } | 
         { key: "app.updateCitizen", input: Citizen, result: null } | 
         { key: "app.updateCity", input: City, result: null } | 
+        { key: "app.updateCountry", input: Country, result: null } | 
         { key: "app.updateRegion", input: Region, result: null },
     mutations: 
+        { key: "app.battleGetPossibleAttacks", input: Position, result: Position[] } | 
+        { key: "app.battleGetPossibleMoves", input: Position, result: Position[] } | 
+        { key: "app.battleMove", input: [Position, Position], result: BattleState } | 
         { key: "app.gameId", input: never, result: string } | 
         { key: "app.gameManager", input: never, result: GameData },
     subscriptions: 
@@ -19,24 +24,34 @@ export type Procedures = {
         { key: "app.gameManager", input: never, result: Igniter }
 };
 
-export type Gender = "Male" | "Female"
-
 export type ItemOwner = { Citizen: number } | { City: number } | { Country: number } | "None"
 
-export type Relation = { id: number; name: string; impression: number; relation_type: RelationType; last_met_timestamp: number }
-
-export type RelationType = "Child" | "Parent" | "Sibling" | "Partner" | "Acquaintance" | "Clan"
+export type Cell = { delay: number; manpower: number; attack: number; defense: number; evasion_rate: number; unit_type: UnitType; unit_id: number; owner_id: number; message: string | null }
 
 export type City = { id: number; name: string; position_x: number; position_y: number; dev_production: number; dev_building: number; dev_infrastructure: number; exp_dev_production: number; exp_dev_building: number; exp_dev_infrastructure: number; control: number; environment: number; region_id: number; country_id: number | null }
 
+export type Country = { id: number; name: string; color_primary: string; color_secondary: string; capital_city_id: number }
+
 export type Igniter = "GameId" | "GameData"
 
-export type Region = { id: number; name: string; product: string; country_id: number | null; position_x: number; position_y: number }
+export type Region = { id: number; name: string; product: string; position_x: number; position_y: number }
 
-export type GameData = { game_id: string; citizens: [number, Citizen][]; cities: [number, City][]; regions: [number, Region][]; items: [number, Item][]; timestamp: number }
+export type GameData = { game_id: string; citizens: [number, Citizen][]; cities: [number, City][]; regions: [number, Region][]; countries: [number, Country][]; items: [number, Item][]; timestamp: number }
 
 export type ItemName = "Food" | "Resource" | "Weapon" | "Money"
 
+export type Gender = "Male" | "Female"
+
 export type Item = { count: number; id: number; name: ItemName; owner: ItemOwner }
 
-export type Citizen = { id: number; name: string; born_timestamp: number; death_timestamp: number | null; gender: Gender; job: string | null; staying_city_id: number; home_city_id: number; country_id: number | null; relations: { [key: number]: Relation } }
+export type Relation = { id: number; name: string; impression: number; relation_type: RelationType; last_met_timestamp: number }
+
+export type Position = { y: number; x: number }
+
+export type UnitType = "Infantry" | "Cavalry" | "Artillery" | "Mage"
+
+export type RelationType = "Child" | "Parent" | "Sibling" | "Partner" | "Acquaintance" | "Clan"
+
+export type Citizen = { id: number; name: string; born_timestamp: number; death_timestamp: number | null; gender: Gender; job: string | null; staying_city_id: number; home_city_id: number; country_id: number | null; relations: { [key: number]: Relation }; level: number; rank: number; exp: number; skill_points: number; money: number }
+
+export type BattleState = { board: Cell | null[][]; round: number; attacker_id: number; defender_id: number; start_timestamp: number; end_timestamp: number | null }

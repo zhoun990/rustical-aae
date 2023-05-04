@@ -1,8 +1,8 @@
-import { client } from "../client";
-import { store } from "../main";
-import { Region } from "../types/rspc/bindings";
-import { GameCache } from "../utils/GameCache";
-import { N } from "../utils/NumericUtils";
+import { client } from "../../client";
+import { store } from "../../main";
+import { Region } from "../../types/rspc/bindings";
+import { GameCache } from "../../utils/GameCache";
+import { N } from "../../utils/NumericUtils";
 import { CityClass } from "./City";
 
 export class RegionClass {

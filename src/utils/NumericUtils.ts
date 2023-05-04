@@ -101,4 +101,14 @@ export class N {
 	static ratio(a: number, b: number, c: number): number {
 		return (b * c) / a;
 	}
+
+	/**
+	 *
+	 * @param molecule 分子
+	 * @param denominator 分母
+	 * @returns boolean 当選したかどうか
+	 */
+	static percentage(molecule: number, denominator = 100): boolean {
+		return !this.random(0, denominator / molecule - 1);
+	}
 }

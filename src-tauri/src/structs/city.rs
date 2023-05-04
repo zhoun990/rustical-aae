@@ -102,16 +102,22 @@ impl City {
 }
 #[async_trait]
 impl HandleGameManager for City {
-    async fn update(self) -> Result<()> {
+    async fn update_gm(self) -> Result<()> {
         let gm = GAME_MANAGER.lock().await;
         if let Some(st) = gm.cities.get(&self.id) {
             let mut st = st.lock().await;
-
-            let pool = &getPool();
-            let mut tx = pool.begin().await?;
-            sqlx::query(
+            self.update_db().await.unwrap();
+            *st = self;
+            return Ok(());
+        };
+        Err(anyhow!("citizen is not exists in gm"))
+    }
+    async fn update_db(&self) -> Result<()> {
+        let pool = &getPool();
+        let mut tx = pool.begin().await?;
+        sqlx::query(
                 "UPDATE cities SET name = ?, dev_production = ?, dev_building = ?,
-                dev_infrastructure = ?, exp_dev_production = ?, exp_dev_building = ?, exp_dev_infrastructure = ?, control = ?, environment = ?,country_id = ? WHERE id = ?"
+                dev_infrastructure = ?, exp_dev_production = ?, exp_dev_building = ?, exp_dev_infrastructure = ?, control = ?, environment = ?, country_id = ? WHERE id = ?"
             )
             .bind(&self.name)
             .bind(&self.dev_production)
@@ -127,10 +133,7 @@ impl HandleGameManager for City {
             .execute(&mut tx)
             .await?;
 
-            tx.commit().await?;
-            *st = self;
-            return Ok(());
-        };
-        Err(anyhow!("citizen is not exists in gm"))
+        tx.commit().await?;
+        Ok(())
     }
 }

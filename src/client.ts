@@ -75,6 +75,7 @@ export const useMutationState = <
 		useSubscription([subscription] as any, {
 			onData: (v) => {
 				console.log("^_^ Log \n file: App.tsx:132 \n v:", v);
+				//@ts-expect-error
 				mutate(undefined);
 
 				// console.log("^_^ Log \n file: App.tsx:134 \n v:", v);

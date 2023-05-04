@@ -1,8 +1,8 @@
-import { client } from "../client";
-import { store } from "../main";
-import { Citizen } from "../types/rspc/bindings";
-import { GameCache } from "../utils/GameCache";
-import { YEAR } from "../utils/constans";
+import { client } from "../../client";
+import { store } from "../../main";
+import { Citizen } from "../../types/rspc/bindings";
+import { GameCache } from "../../utils/GameCache";
+import { YEAR } from "../../utils/constans";
 import { RegionClass } from "./Region";
 
 export class CitizenClass {
